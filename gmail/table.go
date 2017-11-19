@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
-
 	"github.com/jroimartin/gocui"
 )
 
@@ -34,55 +32,51 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 }
 
 func main() {
-	g, err := gocui.NewGui(gocui.OutputNormal)
-	if err != nil {
-		log.Panicln(err)
+	/*
+		g, err := gocui.NewGui(gocui.OutputNormal)
+		if err != nil {
+			log.Panicln(err)
+		}
+		defer g.Close()
+
+		g.SetManagerFunc(layout)
+
+		if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
+			log.Panicln(err)
+		}
+
+		if err := g.SetKeybinding("table", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
+			log.Panicln(err)
+		}
+		if err := g.SetKeybinding("table", gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
+			log.Panicln(err)
+		}
+
+		g.Cursor = true
+
+		if err != nil {
+			log.Panicln(err)
+		}
+
+		if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
+			log.Panicln(err)
+		}
+
+		fmt.Println("bye!")
+	*/
+	fmt.Println("Starting")
+	// ch := make(chan string)
+	stopCh := make(chan struct{})
+	subjects := getSubjects(stopCh)
+	counter := 0
+	for subject := range subjects {
+		counter += 1
+		fmt.Printf("subject: %v\n", subject)
+		if counter == 50 {
+			fmt.Println("sending stop signal")
+			close(stopCh)
+		}
 	}
-	defer g.Close()
-
-	g.SetManagerFunc(layout)
-
-	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
-		log.Panicln(err)
-	}
-
-	if err := g.SetKeybinding("table", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
-		log.Panicln(err)
-	}
-	if err := g.SetKeybinding("table", gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
-		log.Panicln(err)
-	}
-
-	// err = g.SetKeybinding("table", gocui.KeyArrowUp, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
-	// 	fmt.Fprintf(v, "up!")
-	// 	return nil
-	// })
-	// if err != nil {
-	// 	log.Panicln(err)
-	// }
-	// err = g.SetKeybinding("", gocui.KeyArrowDown, gocui.ModNone, func(g *gocui.Gui, v *gocui.View) error {
-	// 	dx := 0
-	// 	dy := 1
-	// 	x0, y0, x1, y1, err := g.ViewPosition("table")
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if _, err := g.SetView("table", x0+dx, y0+dy, x1+dx, y1+dy); err != nil {
-	// 		return err
-	// 	}
-	// 	return nil
-	// })
-	g.Cursor = true
-
-	if err != nil {
-		log.Panicln(err)
-	}
-
-	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
-		log.Panicln(err)
-	}
-
-	fmt.Println("bye!")
 }
 
 func layout(g *gocui.Gui) error {
@@ -91,13 +85,23 @@ func layout(g *gocui.Gui) error {
 	// rows := []string{"one", "two", "three"}
 
 	if v, err := g.SetView("table", 0, 0, maxX, maxY); err != nil {
-		subjects, _ := getSubjects()
-		for i, e := range subjects {
-			fmt.Fprintf(v, "%v.) %v\n", i, e)
+		ch := make(chan string)
+		for subject := range ch {
+			fmt.Fprintf(v, "%v\n", subject)
 		}
+		// subjects, _ := getSubjects(ch)
+
+		/*
+			for i, e := range subjects {
+				fmt.Fprintf(v, "%v.) %v\n", i, e)
+			}
+		*/
+
 		v.Frame = false
 
-		v.SetOrigin(0, 0)
+		if err := v.SetOrigin(0, 0); err != nil {
+			return err
+		}
 		v.Wrap = true
 		// v.Editable = true
 		// if editable is false, need to implement own cursor up and down methods

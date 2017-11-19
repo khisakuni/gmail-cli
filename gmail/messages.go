@@ -17,7 +17,7 @@ import (
 	"google.golang.org/api/gmail/v1"
 )
 
-func getSubjects() ([]string, error) {
+func getSubjects(stopChan <-chan struct{}) <-chan string {
 	srv, _ := newGmailService()
 	messageIds := make([]string, 0)
 	user := "me"
@@ -32,19 +32,34 @@ func getSubjects() ([]string, error) {
 
 	ch := make(chan string)
 
+	fmt.Println("starting to get messages")
 	for _, id := range messageIds {
-		go getMessage(srv, id, ch)
+		go func(messageId string) {
+			for {
+				select {
+				case <-stopChan:
+					close(ch)
+				case ch <- getMessage(srv, messageId):
+				}
+			}
+		}(id)
 	}
 
-	subjects := make([]string, 0)
-	for e := range ch {
-		subjects = append(subjects, e)
-		if len(subjects) >= len(messageIds) {
-			close(ch)
+	return ch
+}
+
+func getMessage(client *gmail.Service, id string) string {
+	res, err := client.Users.Messages.Get("me", id).Do()
+	if err != nil {
+		// TODO: handle error
+		log.Fatalf("oh no %v\n", err)
+	}
+	for _, header := range res.Payload.Headers {
+		if header.Name == "Subject" {
+			return header.Value
 		}
 	}
-
-	return subjects, nil
+	return ""
 }
 
 func newGmailService() (*gmail.Service, error) {
@@ -136,19 +151,6 @@ func saveToken(file string, token *oauth2.Token) {
 	}
 	defer f.Close()
 	json.NewEncoder(f).Encode(token)
-}
-
-func getMessage(client *gmail.Service, id string, ch chan<- string) {
-	res, err := client.Users.Messages.Get("me", id).Do()
-	if err != nil {
-		log.Fatalf("oh no %v\n", err)
-	}
-	for _, header := range res.Payload.Headers {
-		if header.Name == "Subject" {
-			ch <- header.Value
-			break
-		}
-	}
 }
 
 // func main() {
