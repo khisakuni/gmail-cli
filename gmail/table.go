@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/jroimartin/gocui"
+	"log"
 )
 
 func cursorDown(g *gocui.Gui, v *gocui.View) error {
@@ -31,68 +32,89 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+var subjectsList []string = make([]string, 0)
+var ids []string = make([]string, 0)
+
 func main() {
-	/*
-		g, err := gocui.NewGui(gocui.OutputNormal)
-		if err != nil {
-			log.Panicln(err)
-		}
-		defer g.Close()
 
-		g.SetManagerFunc(layout)
-
-		if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
-			log.Panicln(err)
-		}
-
-		if err := g.SetKeybinding("table", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
-			log.Panicln(err)
-		}
-		if err := g.SetKeybinding("table", gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
-			log.Panicln(err)
-		}
-
-		g.Cursor = true
-
-		if err != nil {
-			log.Panicln(err)
-		}
-
-		if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
-			log.Panicln(err)
-		}
-
-		fmt.Println("bye!")
-	*/
-	fmt.Println("Starting")
-	// ch := make(chan string)
-	stopCh := make(chan struct{})
-	subjects := getSubjects(stopCh)
-	counter := 0
-	for subject := range subjects {
-		counter += 1
-		fmt.Printf("subject: %v\n", subject)
-		if counter == 50 {
-			fmt.Println("sending stop signal")
-			close(stopCh)
-		}
+	// GETTING SUBJECTS
+	list, err := getMessageIds()
+	ids = list
+	if err != nil {
+		log.Fatalf("noooo %v", err)
 	}
+
+	/*
+		ch := make(chan string)
+		getSubjects(ids, ch)
+		for subject := range ch {
+			subjectsList = append(subjectsList, subject)
+			if len(ids) == len(subjectsList) {
+				close(ch)
+			}
+		}
+	*/
+
+	g, err := gocui.NewGui(gocui.OutputNormal)
+	if err != nil {
+		log.Panicln(err)
+	}
+	defer g.Close()
+
+	g.SetManagerFunc(layout)
+
+	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
+		log.Panicln(err)
+	}
+
+	if err := g.SetKeybinding("table", gocui.KeyArrowDown, gocui.ModNone, cursorDown); err != nil {
+		log.Panicln(err)
+	}
+	if err := g.SetKeybinding("table", gocui.KeyArrowUp, gocui.ModNone, cursorUp); err != nil {
+		log.Panicln(err)
+	}
+
+	g.Cursor = true
+
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
+		log.Panicln(err)
+	}
+
+	fmt.Println("bye!")
 }
 
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 
-	// rows := []string{"one", "two", "three"}
-
 	if v, err := g.SetView("table", 0, 0, maxX, maxY); err != nil {
-		ch := make(chan string)
-		for subject := range ch {
-			fmt.Fprintf(v, "%v\n", subject)
-		}
-		// subjects, _ := getSubjects(ch)
 
 		/*
-			for i, e := range subjects {
+			for _, e := range items {
+				time.Sleep(1000 * time.Millisecond)
+				fmt.Printf("SUBJECT>>> %v\n", e)
+			}
+		*/
+
+		if len(subjectsList) < len(ids) {
+			ch := make(chan string)
+			getSubjects(ids, ch)
+			for subject := range ch {
+				fmt.Printf("SUBJECT>>> %v\n", subject)
+				subjectsList = append(subjectsList, subject)
+				// fmt.Fprintf(v, "%v\n", subject)
+
+				if len(ids) == len(subjectsList) {
+					close(ch)
+				}
+			}
+		}
+
+		/*
+			for i, e := range subjectsList {
 				fmt.Fprintf(v, "%v.) %v\n", i, e)
 			}
 		*/

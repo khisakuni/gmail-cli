@@ -17,35 +17,32 @@ import (
 	"google.golang.org/api/gmail/v1"
 )
 
-func getSubjects(stopChan <-chan struct{}) <-chan string {
+func getMessageIds() ([]string, error) {
 	srv, _ := newGmailService()
 	messageIds := make([]string, 0)
 	user := "me"
 	r, err := srv.Users.Messages.List(user).Do()
 	if err != nil {
 		log.Fatalf("Unable to retrieve labels. %v", err)
+		return nil, err
 	}
 
 	for _, message := range r.Messages {
 		messageIds = append(messageIds, message.Id)
 	}
 
-	ch := make(chan string)
+	return messageIds, nil
+}
+
+func getSubjects(messageIds []string, ch chan<- string) {
+	srv, _ := newGmailService()
 
 	fmt.Println("starting to get messages")
 	for _, id := range messageIds {
 		go func(messageId string) {
-			for {
-				select {
-				case <-stopChan:
-					close(ch)
-				case ch <- getMessage(srv, messageId):
-				}
-			}
+			ch <- getMessage(srv, messageId)
 		}(id)
 	}
-
-	return ch
 }
 
 func getMessage(client *gmail.Service, id string) string {
