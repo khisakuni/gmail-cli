@@ -44,17 +44,6 @@ func main() {
 		log.Fatalf("noooo %v", err)
 	}
 
-	/*
-		ch := make(chan string)
-		getSubjects(ids, ch)
-		for subject := range ch {
-			subjectsList = append(subjectsList, subject)
-			if len(ids) == len(subjectsList) {
-				close(ch)
-			}
-		}
-	*/
-
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
 		log.Panicln(err)
@@ -92,32 +81,18 @@ func layout(g *gocui.Gui) error {
 
 	if v, err := g.SetView("table", 0, 0, maxX, maxY); err != nil {
 
-		/*
-			for _, e := range items {
-				time.Sleep(1000 * time.Millisecond)
-				fmt.Printf("SUBJECT>>> %v\n", e)
-			}
-		*/
-
 		if len(subjectsList) < len(ids) {
 			ch := make(chan string)
 			getSubjects(ids, ch)
 			for subject := range ch {
-				fmt.Printf("SUBJECT>>> %v\n", subject)
+				fmt.Printf("> %v\n", subject)
 				subjectsList = append(subjectsList, subject)
-				// fmt.Fprintf(v, "%v\n", subject)
 
 				if len(ids) == len(subjectsList) {
 					close(ch)
 				}
 			}
 		}
-
-		/*
-			for i, e := range subjectsList {
-				fmt.Fprintf(v, "%v.) %v\n", i, e)
-			}
-		*/
 
 		v.Frame = false
 
@@ -132,7 +107,6 @@ func layout(g *gocui.Gui) error {
 	// delta := 2
 
 	// v, _ := g.SetView(fmt.Sprintf("row-%v", i), 1, delta*(i+1), maxX, (i+1)*delta+delta)
-	// v.Autoscroll = true
 
 	g.SetCurrentView("table")
 

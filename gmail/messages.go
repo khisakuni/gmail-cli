@@ -17,11 +17,20 @@ import (
 	"google.golang.org/api/gmail/v1"
 )
 
+type option struct {
+	key, value string
+}
+
+func (o option) Get() (key, value string) {
+	return o.key, o.value
+}
+
 func getMessageIds() ([]string, error) {
 	srv, _ := newGmailService()
 	messageIds := make([]string, 0)
 	user := "me"
-	r, err := srv.Users.Messages.List(user).Do()
+	query := option{key: "maxResults", value: "20"}
+	r, err := srv.Users.Messages.List(user).Do(query)
 	if err != nil {
 		log.Fatalf("Unable to retrieve labels. %v", err)
 		return nil, err
