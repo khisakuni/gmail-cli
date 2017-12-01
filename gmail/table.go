@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/jroimartin/gocui"
 	"log"
+
+	"google.golang.org/api/googleapi"
+
+	"github.com/jroimartin/gocui"
 )
 
 func cursorDown(g *gocui.Gui, v *gocui.View) error {
@@ -38,11 +41,10 @@ var ids []string = make([]string, 0)
 func main() {
 
 	// GETTING SUBJECTS
-	list, err := getMessageIds()
+	query := []googleapi.CallOption{option{key: "maxResults", value: "20"}}
+	list, err := getMessageIds(query)
+
 	ids = list
-	if err != nil {
-		log.Fatalf("noooo %v", err)
-	}
 
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
@@ -85,7 +87,7 @@ func layout(g *gocui.Gui) error {
 			ch := make(chan string)
 			getSubjects(ids, ch)
 			for subject := range ch {
-				fmt.Printf("> %v\n", subject)
+				fmt.Printf("> next: %v\n", subject)
 				subjectsList = append(subjectsList, subject)
 
 				if len(ids) == len(subjectsList) {
@@ -100,13 +102,7 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Wrap = true
-		// v.Editable = true
-		// if editable is false, need to implement own cursor up and down methods
 	}
-
-	// delta := 2
-
-	// v, _ := g.SetView(fmt.Sprintf("row-%v", i), 1, delta*(i+1), maxX, (i+1)*delta+delta)
 
 	g.SetCurrentView("table")
 

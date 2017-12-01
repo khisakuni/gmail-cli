@@ -11,6 +11,8 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"google.golang.org/api/googleapi"
+
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -25,16 +27,39 @@ func (o option) Get() (key, value string) {
 	return o.key, o.value
 }
 
-func getMessageIds() ([]string, error) {
+var prevPageToken string
+var nextPageToken string
+
+func getNext() ([]string, error) {
+	query := []googleapi.CallOption{
+		option{key: "maxResults", value: "20"},
+		option{key: "pageToken", value: nextPageToken},
+	}
+	return getMessageIds(query)
+}
+
+func getMessageIds(options []googleapi.CallOption) ([]string, error) {
 	srv, _ := newGmailService()
 	messageIds := make([]string, 0)
 	user := "me"
-	query := option{key: "maxResults", value: "20"}
-	r, err := srv.Users.Messages.List(user).Do(query)
+	// query := option{key: "maxResults", value: "20"}
+
+	// var response *gmail.ListMessagesResponse
+	// if nextToken != nil {
+	// 	pageToken := option{key: "pageToken", value: nextToken}
+	// } else if prevToken != nil {
+	// 	pageToken := option{key: "pageToken", value: prevToken}
+	// } else {
+
+	// }
+
+	r, err := srv.Users.Messages.List(user).Do(options...)
 	if err != nil {
 		log.Fatalf("Unable to retrieve labels. %v", err)
 		return nil, err
 	}
+	prevPageToken = nextPageToken
+	nextPageToken = r.NextPageToken
 
 	for _, message := range r.Messages {
 		messageIds = append(messageIds, message.Id)
@@ -46,7 +71,6 @@ func getMessageIds() ([]string, error) {
 func getSubjects(messageIds []string, ch chan<- string) {
 	srv, _ := newGmailService()
 
-	fmt.Println("starting to get messages")
 	for _, id := range messageIds {
 		go func(messageId string) {
 			ch <- getMessage(srv, messageId)
@@ -158,56 +182,3 @@ func saveToken(file string, token *oauth2.Token) {
 	defer f.Close()
 	json.NewEncoder(f).Encode(token)
 }
-
-// func main() {
-// 	ctx := context.Background()
-
-// 	b, err := ioutil.ReadFile("client_secret.json")
-// 	if err != nil {
-// 		log.Fatalf("Unable to read client secret file: %v", err)
-// 	}
-
-// 	// If modifying these scopes, delete your previously saved credentials
-// 	// at ~/.credentials/gmail-go-quickstart.json
-// 	config, err := google.ConfigFromJSON(b, gmail.GmailReadonlyScope)
-// 	if err != nil {
-// 		log.Fatalf("Unable to parse client secret file to config: %v", err)
-// 	}
-// 	client := getClient(ctx, config)
-
-// 	srv, err := gmail.New(client)
-// 	if err != nil {
-// 		log.Fatalf("Unable to retrieve gmail Client %v", err)
-// 	}
-
-// 	messageIds := make([]string, 0)
-// 	user := "me"
-// 	r, err := srv.Users.Messages.List(user).Do()
-// 	if err != nil {
-// 		log.Fatalf("Unable to retrieve labels. %v", err)
-// 	}
-
-// 	for _, message := range r.Messages {
-// 		messageIds = append(messageIds, message.Id)
-// 	}
-
-// 	fmt.Println(messageIds)
-// 	fmt.Printf("%v messages\n", len(messageIds))
-
-// 	ch := make(chan string)
-
-// 	for _, id := range messageIds {
-// 		go getMessage(srv, id, ch)
-// 	}
-
-// 	subjects := make([]string, 0)
-// 	for e := range ch {
-// 		fmt.Printf(">> %v\n", e)
-// 		subjects = append(subjects, e)
-// 		if len(subjects) >= len(messageIds) {
-// 			close(ch)
-// 		}
-// 	}
-
-// 	fmt.Println(subjects)
-// }
