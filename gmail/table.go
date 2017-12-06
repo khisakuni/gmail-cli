@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 
-	"google.golang.org/api/googleapi"
-
 	"github.com/jroimartin/gocui"
 )
 
@@ -41,6 +39,31 @@ func onClick(g *gocui.Gui, v *gocui.View) error {
 		table.Clear()
 		ids, _ := getNext()
 		subjectsList = make([]string, 0)
+		fmt.Fprintf(table, "next page token: %v\n", nextPageToken)
+		if len(subjectsList) < len(ids) {
+			ch := make(chan string)
+			getSubjects(ids, ch)
+			for subject := range ch {
+				fmt.Fprintf(table, "> next: %v\n", subject)
+				subjectsList = append(subjectsList, subject)
+
+				if len(ids) == len(subjectsList) {
+					close(ch)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func onClickPrev(g *gocui.Gui, v *gocui.View) error {
+	if v != nil {
+		table, _ := g.SetCurrentView("table")
+		table.Clear()
+		tokens := &prevPageTokens
+		fmt.Fprintf(table, "prev page token: %v\n", *tokens)
+		ids, _ := getPrev()
+		subjectsList = make([]string, 0)
 		if len(subjectsList) < len(ids) {
 			ch := make(chan string)
 			getSubjects(ids, ch)
@@ -63,8 +86,8 @@ var ids []string = make([]string, 0)
 func main() {
 
 	// GETTING SUBJECTS
-	query := []googleapi.CallOption{option{key: "maxResults", value: "20"}}
-	list, err := getMessageIds(query)
+	// query := []googleapi.CallOption{option{key: "maxResults", value: "20"}}
+	list, err := getNext()
 
 	ids = list
 
@@ -77,6 +100,10 @@ func main() {
 	g.SetManagerFunc(layout)
 
 	if err := g.SetKeybinding("nextBtn", gocui.MouseLeft, gocui.ModNone, onClick); err != nil {
+		log.Panicln(err)
+	}
+
+	if err := g.SetKeybinding("prevBtn", gocui.MouseLeft, gocui.ModNone, onClickPrev); err != nil {
 		log.Panicln(err)
 	}
 
@@ -107,14 +134,24 @@ func main() {
 func layout(g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 
-	if v, err := g.SetView("nextBtn", 0, 0, maxX, 4); err != nil {
+	if v, err := g.SetView("nextBtn", 0, 0, 10, 4); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorGreen
 		v.SelFgColor = gocui.ColorBlack
-		fmt.Fprintln(v, "Button 1 - line 1")
+		fmt.Fprintln(v, "NEXT")
+	}
+
+	if v, err := g.SetView("prevBtn", 12, 0, maxX, 4); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		v.Highlight = true
+		v.SelBgColor = gocui.ColorGreen
+		v.SelFgColor = gocui.ColorBlack
+		fmt.Fprintln(v, "PREV")
 	}
 
 	if v, err := g.SetView("table", 0, 5, maxX, maxY); err != nil {

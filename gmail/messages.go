@@ -27,38 +27,28 @@ func (o option) Get() (key, value string) {
 	return o.key, o.value
 }
 
-var prevPageToken string
 var nextPageToken string
+
+var prevPageTokens []string
 
 func getNext() ([]string, error) {
 	query := []googleapi.CallOption{
 		option{key: "maxResults", value: "20"},
 		option{key: "pageToken", value: nextPageToken},
 	}
-	return getMessageIds(query)
-}
 
-func getMessageIds(options []googleapi.CallOption) ([]string, error) {
 	srv, _ := newGmailService()
 	messageIds := make([]string, 0)
 	user := "me"
-	// query := option{key: "maxResults", value: "20"}
 
-	// var response *gmail.ListMessagesResponse
-	// if nextToken != nil {
-	// 	pageToken := option{key: "pageToken", value: nextToken}
-	// } else if prevToken != nil {
-	// 	pageToken := option{key: "pageToken", value: prevToken}
-	// } else {
-
-	// }
-
-	r, err := srv.Users.Messages.List(user).Do(options...)
+	r, err := srv.Users.Messages.List(user).Do(query...)
 	if err != nil {
 		log.Fatalf("Unable to retrieve labels. %v", err)
 		return nil, err
 	}
-	prevPageToken = nextPageToken
+
+	tokens := &prevPageTokens
+	*tokens = append([]string{nextPageToken}, *tokens...)
 	nextPageToken = r.NextPageToken
 
 	for _, message := range r.Messages {
@@ -67,6 +57,57 @@ func getMessageIds(options []googleapi.CallOption) ([]string, error) {
 
 	return messageIds, nil
 }
+
+func getPrev() ([]string, error) {
+	token := prevPageTokens[0]
+	tokens := &prevPageTokens
+	fmt.Println(len(*tokens))
+	remaining := prevPageTokens[1:]
+	*tokens = remaining
+
+	fmt.Println(len(remaining))
+	query := []googleapi.CallOption{
+		option{key: "maxResults", value: "20"},
+		option{key: "pageToken", value: token},
+	}
+	srv, _ := newGmailService()
+	messageIds := make([]string, 0)
+	user := "me"
+
+	r, err := srv.Users.Messages.List(user).Do(query...)
+	if err != nil {
+		log.Fatalf("Unable to retrieve labels. %v", err)
+		return nil, err
+	}
+
+	for _, message := range r.Messages {
+		messageIds = append(messageIds, message.Id)
+	}
+
+	return messageIds, nil
+}
+
+// func getMessageIds() ([]string, error) {
+// 	srv, _ := newGmailService()
+// 	messageIds := make([]string, 0)
+// 	user := "me"
+
+// 	r, err := srv.Users.Messages.List(user).Do(options...)
+// 	if err != nil {
+// 		log.Fatalf("Unable to retrieve labels. %v", err)
+// 		return nil, err
+// 	}
+
+// 	tokens := &prevPageTokens
+// 	*tokens = append([]string{nextPageToken}, *tokens...)
+// 	nextPageToken = r.NextPageToken
+
+// 	for _, message := range r.Messages {
+// 		messageIds = append(messageIds, message.Id)
+// 	}
+
+// 	return messageIds, nil
+// }
 
 func getSubjects(messageIds []string, ch chan<- string) {
 	srv, _ := newGmailService()
