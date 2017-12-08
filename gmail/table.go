@@ -7,6 +7,8 @@ import (
 	"github.com/jroimartin/gocui"
 )
 
+var m *messages
+
 func cursorDown(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
 		cx, cy := v.Cursor()
@@ -37,9 +39,8 @@ func onClick(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
 		table, _ := g.SetCurrentView("table")
 		table.Clear()
-		ids, _ := getNext()
+		ids, _ := m.getNext()
 		subjectsList = make([]string, 0)
-		fmt.Fprintf(table, "next page token: %v\n", nextPageToken)
 		if len(subjectsList) < len(ids) {
 			ch := make(chan string)
 			getSubjects(ids, ch)
@@ -60,9 +61,7 @@ func onClickPrev(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
 		table, _ := g.SetCurrentView("table")
 		table.Clear()
-		tokens := &prevPageTokens
-		fmt.Fprintf(table, "prev page token: %v\n", *tokens)
-		ids, _ := getPrev()
+		ids, _ := m.getPrev()
 		subjectsList = make([]string, 0)
 		if len(subjectsList) < len(ids) {
 			ch := make(chan string)
@@ -87,7 +86,10 @@ func main() {
 
 	// GETTING SUBJECTS
 	// query := []googleapi.CallOption{option{key: "maxResults", value: "20"}}
-	list, err := getNext()
+
+	m, _ = newMessages()
+
+	list, err := m.getNext()
 
 	ids = list
 
