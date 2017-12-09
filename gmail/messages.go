@@ -20,10 +20,10 @@ import (
 )
 
 type messages struct {
-	nextPageToken  string
-	prevPageTokens []string
-	gmailService   *gmail.Service
-	loading        bool
+	currentPageToken string
+	nextPageToken    string
+	prevPageTokens   []string
+	gmailService     *gmail.Service
 }
 
 type message struct {
@@ -62,33 +62,31 @@ func newMessages() (*messages, error) {
 }
 
 func (m *messages) getNext() ([]string, error) {
-	m.loading = true
 	query := []googleapi.CallOption{
 		option{key: "maxResults", value: "20"},
 		option{key: "pageToken", value: m.nextPageToken},
 	}
 
 	res, err := getMessageIds(m, query)
-	m.prevPageTokens = append([]string{m.nextPageToken}, m.prevPageTokens...)
+	m.prevPageTokens = append([]string{m.currentPageToken}, m.prevPageTokens...)
+	m.currentPageToken = m.nextPageToken
 	m.nextPageToken = res.nextPageToken
-	m.loading = false
 	return res.messageIds, err
 }
 
 func (m *messages) getPrev() ([]string, error) {
-	m.loading = true
 	if len(m.prevPageTokens) < 2 {
 		return []string{}, nil
 	}
-	token := m.prevPageTokens[1]
-	m.prevPageTokens = m.prevPageTokens[2:]
+	m.nextPageToken = m.currentPageToken
+	m.currentPageToken = m.prevPageTokens[0]
+	m.prevPageTokens = m.prevPageTokens[1:]
 
 	query := []googleapi.CallOption{
 		option{key: "maxResults", value: "20"},
-		option{key: "pageToken", value: token},
+		option{key: "pageToken", value: m.currentPageToken},
 	}
 	res, err := getMessageIds(m, query)
-	m.loading = false
 	return res.messageIds, err
 }
 

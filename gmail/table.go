@@ -37,9 +37,12 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 }
 
 func onClick(g *gocui.Gui, v *gocui.View) error {
+	// if loading {
+	// 	return nil
+	// }
 	if v != nil {
+		loading = true
 		table, _ := g.SetCurrentView("table")
-		fmt.Fprintf(table, "LOADING %v\n", m.loading)
 		ids, _ := m.getNext()
 		subjectsList = make([]message, 0)
 		if len(subjectsList) < len(ids) {
@@ -51,6 +54,8 @@ func onClick(g *gocui.Gui, v *gocui.View) error {
 
 				if len(ids) == len(subjectsList) {
 					close(ch)
+					loading = false
+					fmt.Fprintf(table, "LOADING OFF %v\n", loading)
 				}
 			}
 		}
@@ -59,21 +64,26 @@ func onClick(g *gocui.Gui, v *gocui.View) error {
 }
 
 func onClickPrev(g *gocui.Gui, v *gocui.View) error {
-
+	// if loading {
+	// 	return nil
+	// }
 	if v != nil {
+		loading = true
 		table, _ := g.SetCurrentView("table")
-		fmt.Fprintf(table, "LOADING %v\n", m.loading)
 		ids, _ := m.getPrev()
 		subjectsList = make([]message, 0)
 		if len(subjectsList) < len(ids) {
 			ch := make(chan message)
 			getSubjects(ids, ch)
+
 			for subject := range ch {
 				subjectsList = append(subjectsList, subject)
 				populateTable(table, subjectsList)
 
 				if len(ids) == len(subjectsList) {
 					close(ch)
+					loading = false
+					fmt.Fprintf(table, "LOADING OFF %v\n", loading)
 				}
 			}
 		}
@@ -84,6 +94,9 @@ func onClickPrev(g *gocui.Gui, v *gocui.View) error {
 func populateTable(table *gocui.View, messagesList []message) {
 	table.Clear()
 	sort.Sort(byDate(messagesList))
+	fmt.Fprintf(table, "LOADING %v\n", loading)
+	fmt.Fprintf(table, "tokens >>%v\n", m.prevPageTokens)
+	fmt.Fprintf(table, "nextPageToken %v\n", m.nextPageToken)
 	for _, message := range messagesList {
 		fmt.Fprintf(table, "> %v\n", message.subject)
 	}
@@ -91,6 +104,7 @@ func populateTable(table *gocui.View, messagesList []message) {
 
 var subjectsList []message = make([]message, 0)
 var ids []string = make([]string, 0)
+var loading bool
 
 func main() {
 
