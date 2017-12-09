@@ -23,7 +23,19 @@ type messages struct {
 	nextPageToken  string
 	prevPageTokens []string
 	gmailService   *gmail.Service
+	loading        bool
 }
+
+type message struct {
+	subject string
+	date    int64
+}
+
+type byDate []message
+
+func (d byDate) Len() int           { return len(d) }
+func (d byDate) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
+func (d byDate) Less(i, j int) bool { return d[i].date < d[j].date }
 
 type option struct {
 	key, value string
@@ -50,6 +62,7 @@ func newMessages() (*messages, error) {
 }
 
 func (m *messages) getNext() ([]string, error) {
+	m.loading = true
 	query := []googleapi.CallOption{
 		option{key: "maxResults", value: "20"},
 		option{key: "pageToken", value: m.nextPageToken},
@@ -58,10 +71,12 @@ func (m *messages) getNext() ([]string, error) {
 	res, err := getMessageIds(m, query)
 	m.prevPageTokens = append([]string{m.nextPageToken}, m.prevPageTokens...)
 	m.nextPageToken = res.nextPageToken
+	m.loading = false
 	return res.messageIds, err
 }
 
 func (m *messages) getPrev() ([]string, error) {
+	m.loading = true
 	if len(m.prevPageTokens) < 2 {
 		return []string{}, nil
 	}
@@ -73,6 +88,7 @@ func (m *messages) getPrev() ([]string, error) {
 		option{key: "pageToken", value: token},
 	}
 	res, err := getMessageIds(m, query)
+	m.loading = false
 	return res.messageIds, err
 }
 
@@ -93,7 +109,7 @@ func getMessageIds(m *messages, query []googleapi.CallOption) (messagesResponse,
 	return res, nil
 }
 
-func getSubjects(messageIds []string, ch chan<- string) {
+func getSubjects(messageIds []string, ch chan<- message) {
 	srv, _ := newGmailService()
 
 	for _, id := range messageIds {
@@ -103,7 +119,7 @@ func getSubjects(messageIds []string, ch chan<- string) {
 	}
 }
 
-func getMessage(client *gmail.Service, id string) string {
+func getMessage(client *gmail.Service, id string) message {
 	res, err := client.Users.Messages.Get("me", id).Do()
 	if err != nil {
 		// TODO: handle error
@@ -111,10 +127,10 @@ func getMessage(client *gmail.Service, id string) string {
 	}
 	for _, header := range res.Payload.Headers {
 		if header.Name == "Subject" {
-			return header.Value
+			return message{subject: header.Value, date: res.InternalDate}
 		}
 	}
-	return ""
+	return message{}
 }
 
 func newGmailService() (*gmail.Service, error) {

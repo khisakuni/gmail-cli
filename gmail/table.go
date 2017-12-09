@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"sort"
 
 	"github.com/jroimartin/gocui"
 )
@@ -38,15 +39,15 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 func onClick(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
 		table, _ := g.SetCurrentView("table")
-		table.Clear()
+		fmt.Fprintf(table, "LOADING %v\n", m.loading)
 		ids, _ := m.getNext()
-		subjectsList = make([]string, 0)
+		subjectsList = make([]message, 0)
 		if len(subjectsList) < len(ids) {
-			ch := make(chan string)
+			ch := make(chan message)
 			getSubjects(ids, ch)
 			for subject := range ch {
-				fmt.Fprintf(table, "> next: %v\n", subject)
 				subjectsList = append(subjectsList, subject)
+				populateTable(table, subjectsList)
 
 				if len(ids) == len(subjectsList) {
 					close(ch)
@@ -58,17 +59,18 @@ func onClick(g *gocui.Gui, v *gocui.View) error {
 }
 
 func onClickPrev(g *gocui.Gui, v *gocui.View) error {
+
 	if v != nil {
 		table, _ := g.SetCurrentView("table")
-		table.Clear()
+		fmt.Fprintf(table, "LOADING %v\n", m.loading)
 		ids, _ := m.getPrev()
-		subjectsList = make([]string, 0)
+		subjectsList = make([]message, 0)
 		if len(subjectsList) < len(ids) {
-			ch := make(chan string)
+			ch := make(chan message)
 			getSubjects(ids, ch)
 			for subject := range ch {
-				fmt.Fprintf(table, "> next: %v\n", subject)
 				subjectsList = append(subjectsList, subject)
+				populateTable(table, subjectsList)
 
 				if len(ids) == len(subjectsList) {
 					close(ch)
@@ -79,19 +81,21 @@ func onClickPrev(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
-var subjectsList []string = make([]string, 0)
+func populateTable(table *gocui.View, messagesList []message) {
+	table.Clear()
+	sort.Sort(byDate(messagesList))
+	for _, message := range messagesList {
+		fmt.Fprintf(table, "> %v\n", message.subject)
+	}
+}
+
+var subjectsList []message = make([]message, 0)
 var ids []string = make([]string, 0)
 
 func main() {
 
 	// GETTING SUBJECTS
 	// query := []googleapi.CallOption{option{key: "maxResults", value: "20"}}
-
-	m, _ = newMessages()
-
-	list, err := m.getNext()
-
-	ids = list
 
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
@@ -126,6 +130,8 @@ func main() {
 		log.Panicln(err)
 	}
 
+	m, _ = newMessages()
+
 	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
 		log.Panicln(err)
 	}
@@ -157,18 +163,18 @@ func layout(g *gocui.Gui) error {
 	}
 
 	if v, err := g.SetView("table", 0, 5, maxX, maxY); err != nil {
-		if len(subjectsList) < len(ids) {
-			ch := make(chan string)
-			getSubjects(ids, ch)
-			for subject := range ch {
-				fmt.Fprintf(v, "> next: %v\n", subject)
-				subjectsList = append(subjectsList, subject)
-
-				if len(ids) == len(subjectsList) {
-					close(ch)
-				}
-			}
-		}
+		// if len(subjectsList) < len(ids) {
+		// 	ch := make(chan message)
+		// 	getSubjects(ids, ch)
+		// 	for subject := range ch {
+		// 		subjectsList = append(subjectsList, subject)
+		// 		fmt.Println(subject)
+		// 		populateTable(v, subjectsList)
+		// 		if len(ids) == len(subjectsList) {
+		// 			close(ch)
+		// 		}
+		// 	}
+		// }
 
 		v.Frame = true
 
