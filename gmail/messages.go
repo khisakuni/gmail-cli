@@ -90,6 +90,21 @@ func (m *messages) getPrev() ([]string, error) {
 	return res.messageIds, err
 }
 
+func getMessages(ids []string) []message {
+	ch := make(chan message)
+	getSubjects(ids, ch)
+	result := make([]message, 0, len(ids))
+
+	for subject := range ch {
+		result = append(result, subject)
+
+		if len(ids) == len(result) {
+			close(ch)
+		}
+	}
+	return result
+}
+
 func getMessageIds(m *messages, query []googleapi.CallOption) (messagesResponse, error) {
 	user := "me"
 	r, err := m.gmailService.Users.Messages.List(user).Do(query...)

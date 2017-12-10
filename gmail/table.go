@@ -44,21 +44,7 @@ func onClick(g *gocui.Gui, v *gocui.View) error {
 		loading = true
 		table, _ := g.SetCurrentView("table")
 		ids, _ := m.getNext()
-		subjectsList = make([]message, 0)
-		if len(subjectsList) < len(ids) {
-			ch := make(chan message)
-			getSubjects(ids, ch)
-			for subject := range ch {
-				subjectsList = append(subjectsList, subject)
-				populateTable(table, subjectsList)
-
-				if len(ids) == len(subjectsList) {
-					close(ch)
-					loading = false
-					fmt.Fprintf(table, "LOADING OFF %v\n", loading)
-				}
-			}
-		}
+		populateTable(table, getMessages(ids))
 	}
 	return nil
 }
@@ -71,22 +57,8 @@ func onClickPrev(g *gocui.Gui, v *gocui.View) error {
 		loading = true
 		table, _ := g.SetCurrentView("table")
 		ids, _ := m.getPrev()
+		populateTable(table, getMessages(ids))
 		subjectsList = make([]message, 0)
-		if len(subjectsList) < len(ids) {
-			ch := make(chan message)
-			getSubjects(ids, ch)
-
-			for subject := range ch {
-				subjectsList = append(subjectsList, subject)
-				populateTable(table, subjectsList)
-
-				if len(ids) == len(subjectsList) {
-					close(ch)
-					loading = false
-					fmt.Fprintf(table, "LOADING OFF %v\n", loading)
-				}
-			}
-		}
 	}
 	return nil
 }
@@ -99,8 +71,8 @@ func populateTable(table *gocui.View, messagesList []message) {
 	}
 }
 
-var subjectsList []message = make([]message, 0)
-var ids []string = make([]string, 0)
+var subjectsList []message
+var ids []string
 var loading bool
 
 func main() {
