@@ -94,9 +94,6 @@ func onClickPrev(g *gocui.Gui, v *gocui.View) error {
 func populateTable(table *gocui.View, messagesList []message) {
 	table.Clear()
 	sort.Sort(byDate(messagesList))
-	fmt.Fprintf(table, "LOADING %v\n", loading)
-	fmt.Fprintf(table, "tokens >>%v\n", m.prevPageTokens)
-	fmt.Fprintf(table, "nextPageToken %v\n", m.nextPageToken)
 	for _, message := range messagesList {
 		fmt.Fprintf(table, "> %v\n", message.subject)
 	}
@@ -107,10 +104,6 @@ var ids []string = make([]string, 0)
 var loading bool
 
 func main() {
-
-	// GETTING SUBJECTS
-	// query := []googleapi.CallOption{option{key: "maxResults", value: "20"}}
-
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
 		log.Panicln(err)
@@ -146,6 +139,24 @@ func main() {
 
 	m, _ = newMessages()
 
+	// Initial messages
+	ids, _ := m.getNext()
+	subjectsList = make([]message, 0)
+	if len(subjectsList) < len(ids) {
+		ch := make(chan message)
+		getSubjects(ids, ch)
+		for subject := range ch {
+			subjectsList = append(subjectsList, subject)
+			// populateTable(table, subjectsList)
+
+			if len(ids) == len(subjectsList) {
+				close(ch)
+				loading = false
+				// fmt.Fprintf(table, "LOADING OFF %v\n", loading)
+			}
+		}
+	}
+
 	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
 		log.Panicln(err)
 	}
@@ -177,18 +188,8 @@ func layout(g *gocui.Gui) error {
 	}
 
 	if v, err := g.SetView("table", 0, 5, maxX, maxY); err != nil {
-		// if len(subjectsList) < len(ids) {
-		// 	ch := make(chan message)
-		// 	getSubjects(ids, ch)
-		// 	for subject := range ch {
-		// 		subjectsList = append(subjectsList, subject)
-		// 		fmt.Println(subject)
-		// 		populateTable(v, subjectsList)
-		// 		if len(ids) == len(subjectsList) {
-		// 			close(ch)
-		// 		}
-		// 	}
-		// }
+		populateTable(v, subjectsList)
+		fmt.Fprintf(v, "LOADED")
 
 		v.Frame = true
 
