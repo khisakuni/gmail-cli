@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -29,6 +30,8 @@ type messages struct {
 type message struct {
 	subject string
 	date    int64
+	body    []byte
+	sender  string
 }
 
 type byDate []message
@@ -138,12 +141,41 @@ func getMessage(client *gmail.Service, id string) message {
 		// TODO: handle error
 		log.Fatalf("oh no %v\n", err)
 	}
-	for _, header := range res.Payload.Headers {
-		if header.Name == "Subject" {
-			return message{subject: header.Value, date: res.InternalDate}
+	mes := message{date: res.InternalDate}
+	// mes.body = res.Snippet
+	// res.Payload.Body.Data
+	body, _ := base64.URLEncoding.DecodeString(res.Payload.Body.Data)
+	if len(body) > 0 {
+		mes.body = body
+	}
+
+	for _, part := range res.Payload.Parts {
+
+		if part.MimeType == "text/html" {
+			body, _ := base64.URLEncoding.DecodeString(part.Body.Data)
+
+			// fmt.Println(string(body))
+			mes.body = body
+			// fmt.Println(mes.body)
+		} else if part.MimeType == "text/plain" {
+			body, _ := base64.URLEncoding.DecodeString(part.Body.Data)
+			mes.body = body
 		}
 	}
-	return message{}
+
+	// body, _ := base64.URLEncoding.DecodeString(res.Payload.Body.Data)
+	// mes.body = string(body)
+
+	for _, header := range res.Payload.Headers {
+		if header.Name == "Subject" {
+			mes.subject = header.Value
+		}
+		if header.Name == "From" {
+			mes.sender = header.Value
+		}
+	}
+	// mes.body = mes.subject + mes.sender
+	return mes
 }
 
 func newGmailService() (*gmail.Service, error) {

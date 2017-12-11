@@ -1,17 +1,58 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"sort"
+	"strings"
+
+	"golang.org/x/net/html"
 
 	"github.com/jroimartin/gocui"
 )
 
 var m *messages
 
+func parseHTML(reader io.Reader) string {
+	tokenizer := html.NewTokenizer(reader)
+	var buffer bytes.Buffer
+	depth := 0
+	for {
+		token := tokenizer.Next()
+		switch token {
+		case html.ErrorToken:
+			return buffer.String()
+		case html.TextToken:
+			if depth > 0 {
+				buffer.WriteString(strings.TrimSpace(string(tokenizer.Text())))
+			}
+		case html.StartTagToken, html.EndTagToken:
+			t := tokenizer.Token().Data
+			if t == "p" || t == "td" {
+				if token == html.StartTagToken {
+					depth++
+				} else {
+					depth--
+				}
+			}
+		}
+	}
+}
+
 func cursorDown(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
+		if messageIndex < len(subjectsList)-1 {
+			messageIndex++
+		}
+
+		messagePane, _ := g.View("message")
+		messagePane.Clear()
+		body := subjectsList[messageIndex].body
+		b := parseHTML(bytes.NewReader(body))
+		fmt.Fprintln(messagePane, b)
+
 		cx, cy := v.Cursor()
 		if err := v.SetCursor(cx, cy+1); err != nil {
 			ox, oy := v.Origin()
@@ -25,6 +66,15 @@ func cursorDown(g *gocui.Gui, v *gocui.View) error {
 
 func cursorUp(g *gocui.Gui, v *gocui.View) error {
 	if v != nil {
+		if messageIndex > 0 {
+			messageIndex--
+		}
+		messagePane, _ := g.View("message")
+		messagePane.Clear()
+		body := subjectsList[messageIndex].body
+		b := parseHTML(bytes.NewReader(body))
+		fmt.Fprintln(messagePane, b)
+
 		ox, oy := v.Origin()
 		cx, cy := v.Cursor()
 		if err := v.SetCursor(cx, cy-1); err != nil && oy > 0 {
@@ -37,42 +87,49 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 }
 
 func onClick(g *gocui.Gui, v *gocui.View) error {
-	// if loading {
-	// 	return nil
-	// }
+	if loading {
+		return nil
+	}
 	if v != nil {
 		loading = true
 		table, _ := g.SetCurrentView("table")
 		ids, _ := m.getNext()
-		populateTable(table, getMessages(ids))
+		ms := getMessages(ids)
+		populateTable(table, ms)
+		loading = false
 	}
 	return nil
 }
 
 func onClickPrev(g *gocui.Gui, v *gocui.View) error {
-	// if loading {
-	// 	return nil
-	// }
+	if loading {
+		return nil
+	}
 	if v != nil {
 		loading = true
 		table, _ := g.SetCurrentView("table")
 		ids, _ := m.getPrev()
 		populateTable(table, getMessages(ids))
+		loading = false
 	}
 	return nil
 }
 
 func populateTable(table *gocui.View, messagesList []message) {
 	table.Clear()
+	table.SetCursor(0, 0)
+	messageIndex = 0
+	subjectsList = messagesList
 	sort.Sort(byDate(messagesList))
 	for _, message := range messagesList {
-		fmt.Fprintf(table, "> %v\n", message.subject)
+		fmt.Fprintf(table, "> %v: %v\n", message.sender, message.subject)
 	}
 }
 
 var subjectsList []message
 var ids []string
 var loading bool
+var messageIndex int
 
 func main() {
 	g, err := gocui.NewGui(gocui.OutputNormal)
@@ -128,7 +185,6 @@ func layout(g *gocui.Gui) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		v.Highlight = true
 		v.SelBgColor = gocui.ColorGreen
 		v.SelFgColor = gocui.ColorBlack
 		fmt.Fprintln(v, "NEXT")
@@ -138,21 +194,24 @@ func layout(g *gocui.Gui) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		v.Highlight = true
 		v.SelBgColor = gocui.ColorGreen
 		v.SelFgColor = gocui.ColorBlack
 		fmt.Fprintln(v, "PREV")
 	}
 
-	if v, err := g.SetView("table", 0, 5, maxX, maxY); err != nil {
+	if v, err := g.SetView("table", 0, 5, maxX, maxY/2); err != nil {
 		populateTable(v, subjectsList)
-		fmt.Fprintf(v, "LOADED")
 
 		v.Frame = true
 
 		if err := v.SetOrigin(0, 0); err != nil {
 			return err
 		}
+		v.Wrap = true
+	}
+
+	if v, err := g.SetView("message", 0, maxY/2+1, maxX, maxY); err != nil {
+		v.Frame = true
 		v.Wrap = true
 	}
 
