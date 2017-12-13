@@ -98,13 +98,15 @@ func getMessages(ids []string) []message {
 	getSubjects(ids, ch)
 	result := make([]message, 0, len(ids))
 
-	for subject := range ch {
-		result = append(result, subject)
-
-		if len(ids) == len(result) {
-			close(ch)
+	for c := 0; c < len(ids); {
+		select {
+		case subject := <-ch:
+			result = append(result, subject)
+			c++
 		}
 	}
+	close(ch)
+
 	return result
 }
 
