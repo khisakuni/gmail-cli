@@ -26,7 +26,10 @@ func parseHTML(reader io.Reader) string {
 			return buffer.String()
 		case html.TextToken:
 			if depth > 0 {
-				buffer.WriteString(strings.TrimSpace(string(tokenizer.Text())))
+				text := strings.TrimSpace(string(tokenizer.Text()))
+				if len(text) > 0 {
+					buffer.WriteString(text + "\n")
+				}
 			}
 		case html.StartTagToken, html.EndTagToken:
 			t := tokenizer.Token().Data
@@ -51,7 +54,11 @@ func cursorDown(g *gocui.Gui, v *gocui.View) error {
 		messagePane.Clear()
 		body := subjectsList[messageIndex].body
 		b := parseHTML(bytes.NewReader(body))
-		fmt.Fprintln(messagePane, b)
+		if len(strings.TrimSpace(b)) > 0 {
+			fmt.Fprintln(messagePane, b)
+		} else {
+			fmt.Fprintln(messagePane, "Content Unavailable")
+		}
 
 		cx, cy := v.Cursor()
 		if err := v.SetCursor(cx, cy+1); err != nil {
@@ -73,7 +80,11 @@ func cursorUp(g *gocui.Gui, v *gocui.View) error {
 		messagePane.Clear()
 		body := subjectsList[messageIndex].body
 		b := parseHTML(bytes.NewReader(body))
-		fmt.Fprintln(messagePane, b)
+		if len(strings.TrimSpace(b)) > 0 {
+			fmt.Fprintln(messagePane, b)
+		} else {
+			fmt.Fprintln(messagePane, "Content Unavailable")
+		}
 
 		ox, oy := v.Origin()
 		cx, cy := v.Cursor()
@@ -112,6 +123,14 @@ func onClickPrev(g *gocui.Gui, v *gocui.View) error {
 		populateTable(table, getMessages(ids))
 		loading = false
 	}
+	return nil
+}
+
+func onClickMessagePane(g *gocui.Gui, v *gocui.View) error {
+	v.Clear()
+	fmt.Fprintln(v, "HI THERE")
+	// g.SetCurrentView("message")
+
 	return nil
 }
 
@@ -158,6 +177,10 @@ func main() {
 		log.Panicln(err)
 	}
 
+	if err := g.SetKeybinding("message", gocui.MouseLeft, gocui.ModNone, onClickMessagePane); err != nil {
+		log.Panicln(err)
+	}
+
 	g.Cursor = true
 	g.Mouse = true
 
@@ -199,7 +222,7 @@ func layout(g *gocui.Gui) error {
 		fmt.Fprintln(v, "PREV")
 	}
 
-	if v, err := g.SetView("table", 0, 5, maxX, maxY/2); err != nil {
+	if v, err := g.SetView("table", 0, 5, maxX-1, maxY/2); err != nil {
 		populateTable(v, subjectsList)
 
 		v.Frame = true
@@ -210,9 +233,11 @@ func layout(g *gocui.Gui) error {
 		v.Wrap = true
 	}
 
-	if v, err := g.SetView("message", 0, maxY/2+1, maxX, maxY); err != nil {
+	if v, err := g.SetView("message", 0, maxY/2+1, maxX-1, maxY-1); err != nil {
 		v.Frame = true
 		v.Wrap = true
+		v.Editable = true
+		v.Autoscroll = true
 	}
 
 	g.SetCurrentView("table")
